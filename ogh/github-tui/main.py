@@ -337,21 +337,22 @@ class GitHubTUI(App):
         """Get the currently selected notification."""
         table = self.query_one("#notifications", DataTable)
 
-        if not table.cursor_row:
+        if table.cursor_row is None:
             return None
 
         try:
             # Get the row key which is the notification ID
-            row = table.get_row_at(table.cursor_row)
             notification_id = str(table.get_row_key(table.cursor_row))
 
             # Find the notification
             notification = next(
-                (n for n in self.notifications if n.id == notification_id),
+                (n for n in self.notifications if str(n.id) == notification_id),
                 None
             )
             return notification
-        except Exception:
+        except Exception as e:
+            status_bar = self.query_one("#status-bar", StatusBar)
+            status_bar.set_status(f"Error getting notification: {e}")
             return None
 
     def action_show_notification_detail(self) -> None:
