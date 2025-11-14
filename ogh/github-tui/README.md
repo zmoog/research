@@ -42,11 +42,25 @@ python main.py
 - `PageUp/PageDown` - Navigate by page (10 rows at a time)
 
 ### Actions
-- `Enter` - Open notification in browser and mark as viewed
+- `Enter` or **Click** - View notification details in a modal panel
 - `r` - Refresh notifications from GitHub
 - `/` - Focus the filter input to search by repository
 - `s` - Toggle sort order (newest first ↔ oldest first)
 - `q` - Quit
+
+### Detail Panel
+When you press `Enter` or click on a notification, a detail panel opens showing:
+- Repository name
+- Issue/PR title
+- Reason for notification (mention, team_mention)
+- Last update time and age
+- Read/unread status
+- Last viewed time (if applicable)
+- Clickable URL
+
+From the detail panel:
+- `o` or click "Open in Browser" - Open the URL in your default browser
+- `Esc` or click "Close" - Close the panel without opening
 
 ### Filtering
 Type `/` to focus the filter input, then type part of a repository name (e.g., "owner/repo"). The table will update in real-time to show only matching repositories. Press `Esc` to exit the filter input and return to navigation.

@@ -6,9 +6,10 @@ from typing import List
 
 from dotenv import load_dotenv
 from textual.app import App, ComposeResult
-from textual.containers import Container, Vertical, Horizontal
-from textual.widgets import Header, Footer, DataTable, Static, Input
+from textual.containers import Container, Vertical, Horizontal, VerticalScroll
+from textual.widgets import Header, Footer, DataTable, Static, Input, Button, Label
 from textual.binding import Binding
+from textual.screen import ModalScreen
 
 from github_client import GitHubClient, NotificationData
 from state_manager import StateManager
@@ -40,6 +41,106 @@ class StatusBar(Static):
         """Update the status message."""
         timestamp = datetime.now().strftime("%H:%M:%S")
         self.update(f"[{timestamp}] {status}")
+
+
+class NotificationDetailScreen(ModalScreen):
+    """Modal screen to display notification details."""
+
+    CSS = """
+    NotificationDetailScreen {
+        align: center middle;
+    }
+
+    #detail-dialog {
+        width: 80;
+        height: auto;
+        max-height: 30;
+        background: $panel;
+        border: thick $primary;
+        padding: 1 2;
+    }
+
+    #detail-content {
+        width: 100%;
+        height: auto;
+        max-height: 20;
+    }
+
+    .detail-field {
+        margin: 0 0 1 0;
+    }
+
+    .detail-label {
+        text-style: bold;
+        color: $accent;
+    }
+
+    .detail-value {
+        color: $text;
+    }
+
+    #button-container {
+        height: auto;
+        width: 100%;
+        align: center middle;
+        margin: 1 0 0 0;
+    }
+
+    Button {
+        margin: 0 1;
+    }
+    """
+
+    BINDINGS = [
+        ("escape", "dismiss", "Close"),
+        ("o", "open_url", "Open URL"),
+    ]
+
+    def __init__(self, notification: NotificationData, **kwargs):
+        super().__init__(**kwargs)
+        self.notification = notification
+
+    def compose(self) -> ComposeResult:
+        """Compose the detail dialog."""
+        with Container(id="detail-dialog"):
+            with VerticalScroll(id="detail-content"):
+                yield Label("[bold]Notification Details[/bold]", classes="detail-field")
+                yield Label("")
+                yield Label(f"[bold cyan]Repository:[/bold cyan]", classes="detail-label")
+                yield Label(f"{self.notification.repository}", classes="detail-value detail-field")
+                yield Label(f"[bold cyan]Title:[/bold cyan]", classes="detail-label")
+                yield Label(f"{self.notification.title}", classes="detail-value detail-field")
+                yield Label(f"[bold cyan]Reason:[/bold cyan]", classes="detail-label")
+                yield Label(f"{self.notification.reason}", classes="detail-value detail-field")
+                yield Label(f"[bold cyan]Updated:[/bold cyan]", classes="detail-label")
+                yield Label(f"{self.notification.updated_at.strftime('%Y-%m-%d %H:%M:%S')}", classes="detail-value detail-field")
+                yield Label(f"[bold cyan]Age:[/bold cyan]", classes="detail-label")
+                yield Label(f"{self.notification.human_age()}", classes="detail-value detail-field")
+                yield Label(f"[bold cyan]Status:[/bold cyan]", classes="detail-label")
+                yield Label(f"{'Unread' if self.notification.unread else 'Read'}", classes="detail-value detail-field")
+                if self.notification.last_viewed:
+                    yield Label(f"[bold cyan]Last Viewed:[/bold cyan]", classes="detail-label")
+                    yield Label(f"{self.notification.last_viewed.strftime('%Y-%m-%d %H:%M:%S')}", classes="detail-value detail-field")
+                yield Label(f"[bold cyan]URL:[/bold cyan]", classes="detail-label")
+                yield Label(f"[link={self.notification.html_url}]{self.notification.html_url}[/link]", classes="detail-value detail-field")
+            with Horizontal(id="button-container"):
+                yield Button("Open in Browser (o)", variant="primary", id="open-btn")
+                yield Button("Close (Esc)", variant="default", id="close-btn")
+
+    def action_dismiss(self) -> None:
+        """Dismiss the modal."""
+        self.dismiss(None)
+
+    def action_open_url(self) -> None:
+        """Open the URL and dismiss."""
+        self.dismiss(self.notification)
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button presses."""
+        if event.button.id == "open-btn":
+            self.action_open_url()
+        elif event.button.id == "close-btn":
+            self.action_dismiss()
 
 
 class GitHubTUI(App):
@@ -94,7 +195,7 @@ class GitHubTUI(App):
     BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
         Binding("r", "refresh", "Refresh", priority=True),
-        Binding("enter", "open_notification", "Open", priority=True),
+        Binding("enter", "show_notification_detail", "View Details", priority=True),
         Binding("s", "toggle_sort", "Reverse Sort", priority=True),
         Binding("/", "focus_filter", "Filter", priority=True),
         ("j", "cursor_down", "Down"),
@@ -232,38 +333,52 @@ class GitHubTUI(App):
         unread_count = sum(1 for n in filtered_notifications if n.unread)
         stats.update_stats(len(filtered_notifications), unread_count)
 
-    def action_open_notification(self) -> None:
-        """Open the selected notification in browser."""
+    def _get_selected_notification(self) -> NotificationData:
+        """Get the currently selected notification."""
         table = self.query_one("#notifications", DataTable)
-        status_bar = self.query_one("#status-bar", StatusBar)
 
         if not table.cursor_row:
-            return
+            return None
 
         try:
-            row_key = table.get_row_at(table.cursor_row)
-            notification_id = str(row_key[0])  # The key we stored
+            # Get the row key which is the notification ID
+            row = table.get_row_at(table.cursor_row)
+            notification_id = str(table.get_row_key(table.cursor_row))
 
             # Find the notification
             notification = next(
                 (n for n in self.notifications if n.id == notification_id),
                 None
             )
+            return notification
+        except Exception:
+            return None
 
-            if notification:
-                # Mark as viewed in our state
-                status_bar.set_status(f"Opening: {notification.title[:50]}...")
-                self.state_manager.mark_viewed(notification.id)
+    def action_show_notification_detail(self) -> None:
+        """Show notification detail modal."""
+        notification = self._get_selected_notification()
 
-                # Open in browser
-                webbrowser.open(notification.html_url)
+        if notification:
+            # Mark as viewed immediately when opening detail panel
+            self.state_manager.mark_viewed(notification.id)
 
-                # Refresh to show updated state
-                self.action_refresh()
+            # Show the detail screen and handle the response
+            self.push_screen(NotificationDetailScreen(notification), self._handle_detail_result)
 
-        except Exception as e:
-            self.title = f"Error opening notification: {e}"
-            status_bar.set_status(f"Error: {e}")
+    def _handle_detail_result(self, notification: NotificationData) -> None:
+        """Handle the result from the detail screen."""
+        if notification:
+            # User chose to open in browser
+            status_bar = self.query_one("#status-bar", StatusBar)
+            status_bar.set_status(f"Opening: {notification.title[:50]}...")
+            webbrowser.open(notification.html_url)
+
+        # Refresh to show updated state (viewed status changed)
+        self._update_table()
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        """Handle row selection (click or Enter)."""
+        self.action_show_notification_detail()
 
     def action_cursor_down(self) -> None:
         """Move cursor down."""
