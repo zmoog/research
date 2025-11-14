@@ -60,6 +60,37 @@ class NotificationData:
             # Never viewed - highest priority
             return hours_since_update * 3.0
 
+    def human_age(self) -> str:
+        """
+        Return human-friendly age string.
+        Examples: "2m", "3h", "5d", "2w", "3mo"
+        """
+        now = datetime.now()
+        delta = now - self.updated_at.replace(tzinfo=None)
+
+        seconds = delta.total_seconds()
+        minutes = seconds / 60
+        hours = minutes / 60
+        days = hours / 24
+        weeks = days / 7
+        months = days / 30
+        years = days / 365
+
+        if years >= 1:
+            return f"{int(years)}y"
+        elif months >= 1:
+            return f"{int(months)}mo"
+        elif weeks >= 1:
+            return f"{int(weeks)}w"
+        elif days >= 1:
+            return f"{int(days)}d"
+        elif hours >= 1:
+            return f"{int(hours)}h"
+        elif minutes >= 1:
+            return f"{int(minutes)}m"
+        else:
+            return "now"
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for display."""
         return {

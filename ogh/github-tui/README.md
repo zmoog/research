@@ -5,9 +5,13 @@ A terminal-based interface for managing GitHub notifications, specifically focus
 ## Features
 
 - View all mentions across your GitHub repositories
-- Sort by date (newest first) and "age" (time since last update vs last time you viewed it)
+- Sort by priority with human-friendly age display (e.g., "2h", "3d", "1w")
+- Toggle between newest-first and oldest-first sorting
+- Filter notifications by repository name
 - Track when you last viewed each notification
+- Real-time status bar showing API operations
 - Clean, keyboard-driven interface
+- Opens notifications directly in your browser
 
 ## Installation
 
@@ -33,10 +37,19 @@ python main.py
 
 ## Keyboard Controls
 
-- `↑/↓` or `j/k` - Navigate through mentions
+### Navigation
+- `↑/↓` or `j/k` - Navigate through mentions one at a time
+- `PageUp/PageDown` - Navigate by page (10 rows at a time)
+
+### Actions
 - `Enter` - Open notification in browser and mark as viewed
-- `r` - Refresh notifications
+- `r` - Refresh notifications from GitHub
+- `/` - Focus the filter input to search by repository
+- `s` - Toggle sort order (newest first ↔ oldest first)
 - `q` - Quit
+
+### Filtering
+Type `/` to focus the filter input, then type part of a repository name (e.g., "owner/repo"). The table will update in real-time to show only matching repositories. Press `Esc` to exit the filter input and return to navigation.
 
 ## How It Works
 

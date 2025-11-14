@@ -6,8 +6,8 @@ from typing import List
 
 from dotenv import load_dotenv
 from textual.app import App, ComposeResult
-from textual.containers import Container, Vertical
-from textual.widgets import Header, Footer, DataTable, Static
+from textual.containers import Container, Vertical, Horizontal
+from textual.widgets import Header, Footer, DataTable, Static, Input
 from textual.binding import Binding
 
 from github_client import GitHubClient, NotificationData
@@ -58,6 +58,16 @@ class GitHubTUI(App):
         text-style: bold;
     }
 
+    #filter-container {
+        height: 3;
+        padding: 0 1;
+        background: $panel;
+    }
+
+    #filter-input {
+        width: 100%;
+    }
+
     #status-bar {
         dock: bottom;
         height: 1;
@@ -85,8 +95,12 @@ class GitHubTUI(App):
         Binding("q", "quit", "Quit", priority=True),
         Binding("r", "refresh", "Refresh", priority=True),
         Binding("enter", "open_notification", "Open", priority=True),
+        Binding("s", "toggle_sort", "Reverse Sort", priority=True),
+        Binding("/", "focus_filter", "Filter", priority=True),
         ("j", "cursor_down", "Down"),
         ("k", "cursor_up", "Up"),
+        ("pagedown", "page_down", "Page Down"),
+        ("pageup", "page_up", "Page Up"),
     ]
 
     def __init__(self):
@@ -94,11 +108,15 @@ class GitHubTUI(App):
         self.github_client = None
         self.state_manager = StateManager()
         self.notifications: List[NotificationData] = []
+        self.reverse_sort = False
+        self.repo_filter = ""
 
     def compose(self) -> ComposeResult:
         """Compose the UI."""
         yield Header(show_clock=True)
         yield NotificationStats(id="stats")
+        with Container(id="filter-container"):
+            yield Input(placeholder="Filter by repository (e.g., owner/repo)...", id="filter-input")
         yield DataTable(id="notifications", cursor_type="row")
         yield StatusBar(id="status-bar")
         yield Footer()
@@ -156,11 +174,11 @@ class GitHubTUI(App):
                 notif_data = NotificationData(mention, last_viewed)
                 self.notifications.append(notif_data)
 
-            # Sort by age score (descending) and then by updated_at (descending)
+            # Sort by age score and then by updated_at
             status_bar.set_status("Sorting notifications by priority...")
             self.notifications.sort(
                 key=lambda n: (n.age_score(), n.updated_at),
-                reverse=True
+                reverse=not self.reverse_sort
             )
 
             # Update the table
@@ -179,12 +197,20 @@ class GitHubTUI(App):
         table = self.query_one("#notifications", DataTable)
         table.clear()
 
-        for notif in self.notifications:
+        # Apply repository filter
+        filtered_notifications = self.notifications
+        if self.repo_filter:
+            filtered_notifications = [
+                n for n in self.notifications
+                if self.repo_filter.lower() in n.repository.lower()
+            ]
+
+        for notif in filtered_notifications:
             # Format the updated time
             updated = notif.updated_at.strftime("%Y-%m-%d %H:%M")
 
-            # Format age score
-            age = f"{notif.age_score():.1f}"
+            # Use human-friendly age
+            age = notif.human_age()
 
             # Status
             status = "●" if notif.unread else "○"
@@ -203,8 +229,8 @@ class GitHubTUI(App):
 
         # Update stats
         stats = self.query_one("#stats", NotificationStats)
-        unread_count = sum(1 for n in self.notifications if n.unread)
-        stats.update_stats(len(self.notifications), unread_count)
+        unread_count = sum(1 for n in filtered_notifications if n.unread)
+        stats.update_stats(len(filtered_notifications), unread_count)
 
     def action_open_notification(self) -> None:
         """Open the selected notification in browser."""
@@ -248,6 +274,50 @@ class GitHubTUI(App):
         """Move cursor up."""
         table = self.query_one("#notifications", DataTable)
         table.action_cursor_up()
+
+    def action_page_down(self) -> None:
+        """Move cursor down by one page."""
+        table = self.query_one("#notifications", DataTable)
+        # Move down by 10 rows (approximately one page)
+        for _ in range(10):
+            table.action_cursor_down()
+
+    def action_page_up(self) -> None:
+        """Move cursor up by one page."""
+        table = self.query_one("#notifications", DataTable)
+        # Move up by 10 rows (approximately one page)
+        for _ in range(10):
+            table.action_cursor_up()
+
+    def action_toggle_sort(self) -> None:
+        """Toggle between normal and reverse sort order."""
+        self.reverse_sort = not self.reverse_sort
+        status_bar = self.query_one("#status-bar", StatusBar)
+        sort_mode = "oldest first" if self.reverse_sort else "newest first"
+        status_bar.set_status(f"Sort order: {sort_mode}")
+
+        # Re-sort and update display
+        self.notifications.sort(
+            key=lambda n: (n.age_score(), n.updated_at),
+            reverse=not self.reverse_sort
+        )
+        self._update_table()
+
+    def action_focus_filter(self) -> None:
+        """Focus the filter input field."""
+        filter_input = self.query_one("#filter-input", Input)
+        filter_input.focus()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Handle filter input changes."""
+        if event.input.id == "filter-input":
+            self.repo_filter = event.value
+            status_bar = self.query_one("#status-bar", StatusBar)
+            if self.repo_filter:
+                status_bar.set_status(f"Filtering by: {self.repo_filter}")
+            else:
+                status_bar.set_status("Filter cleared")
+            self._update_table()
 
 
 def main():
