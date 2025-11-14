@@ -17,8 +17,8 @@ from state_manager import StateManager
 class NotificationStats(Static):
     """Display statistics about notifications."""
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.total = 0
         self.unread = 0
 
