@@ -1,0 +1,83 @@
+receivers:
+  kafka/logs:
+    brokers:
+      - ${env:EVENTHUB_NAMESPACE}:9093
+    logs:
+      topics:
+        - ${env:EVENTHUB_LOGS_NAME:-logs}
+      encoding: ${env:LOGS_ENCODING:-azure_encoding}
+    group_id: ${env:EVENTHUB_CONSUMER_GROUP:-ecf}
+    initial_offset: earliest
+    use_leader_epoch: false
+    auth:
+      sasl:
+        username: $$ConnectionString
+        password: ${env:EVENTHUB_CONNECTION_STRING}
+        mechanism: PLAIN
+    tls: {}
+
+  kafka/metrics:
+    brokers:
+      - ${env:EVENTHUB_NAMESPACE}:9093
+    metrics:
+      topics:
+        - ${env:EVENTHUB_METRICS_NAME:-metrics}
+      encoding: ${env:METRICS_ENCODING:-azure_encoding}
+    group_id: ${env:EVENTHUB_CONSUMER_GROUP:-ecf}
+    initial_offset: earliest
+    use_leader_epoch: false
+    auth:
+      sasl:
+        username: $$ConnectionString
+        password: ${env:EVENTHUB_CONNECTION_STRING}
+        mechanism: PLAIN
+    tls: {}
+
+exporters:
+  debug:
+    verbosity: detailed
+  otlp/elastic:
+    endpoint: ${env:ELASTICSEARCH_OTLP_ENDPOINT}
+    compression: ${env:OTLP_COMPRESSION:-snappy}
+    headers:
+      authorization: ApiKey ${env:ELASTICSEARCH_API_KEY}
+    timeout: 10s
+    sending_queue:
+      enabled: true
+      wait_for_result: true
+      sizer: bytes
+      queue_size: 50_000_000
+      batch:
+        flush_timeout: 1s
+        max_size: 4_000_000
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      multiplier: 2
+      max_elapsed_time: 60s
+
+extensions:
+  azure_encoding: {}
+  beats_encoding:
+    format: json
+    unwrap:
+      - records
+    data_stream:
+      dataset: azure.events
+    input_type: azure-eventhub
+    tags:
+      - forwarded
+      - preserve_original_event
+
+service:
+  extensions: [azure_encoding, beats_encoding]
+  pipelines:
+    logs:
+      receivers: [kafka/logs]
+      exporters: ["${env:PIPELINE_EXPORTER:-otlp/elastic}"]
+    metrics:
+      receivers: [kafka/metrics]
+      exporters: ["${env:PIPELINE_EXPORTER:-otlp/elastic}"]
+  telemetry:
+    metrics:
+      level: basic
