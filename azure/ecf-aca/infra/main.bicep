@@ -70,6 +70,20 @@ resource metricsConsumerGroup 'Microsoft.EventHub/namespaces/eventhubs/consumerg
   name: 'ecf'
 }
 
+resource tracesHub 'Microsoft.EventHub/namespaces/eventhubs@2024-01-01' = {
+  parent: eventHubNamespace
+  name: 'traces'
+  properties: {
+    partitionCount: 4
+    messageRetentionInDays: 1
+  }
+}
+
+resource tracesConsumerGroup 'Microsoft.EventHub/namespaces/eventhubs/consumergroups@2024-01-01' = {
+  parent: tracesHub
+  name: 'ecf'
+}
+
 // Shared access policy with Listen permission for the Kafka consumer.
 // The connection string from this policy is used as the SASL password.
 resource listenRule 'Microsoft.EventHub/namespaces/authorizationRules@2024-01-01' = {
@@ -155,6 +169,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'EVENTHUB_NAMESPACE', value: '${eventHubNamespace.name}.servicebus.windows.net' }
             { name: 'EVENTHUB_LOGS_NAME', value: 'logs' }
             { name: 'EVENTHUB_METRICS_NAME', value: 'metrics' }
+            { name: 'EVENTHUB_TRACES_NAME', value: 'traces' }
             { name: 'EVENTHUB_CONSUMER_GROUP', value: 'ecf' }
             { name: 'EVENTHUB_CONNECTION_STRING', secretRef: 'eventhub-connection-string' }
             { name: 'ELASTICSEARCH_OTLP_ENDPOINT', value: elasticsearchOtlpEndpoint }
