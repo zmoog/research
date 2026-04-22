@@ -1,4 +1,7 @@
-"""Send a test Azure resource log event to Event Hubs using the Kafka protocol."""
+"""Send a test Azure resource event to Event Hubs using the Kafka protocol.
+
+Supports logs, metrics, or traces — set EVENTHUB_NAME to the target hub.
+"""
 
 import json
 import os
@@ -38,7 +41,7 @@ def main():
                 "category": "Administrative",
                 "resultType": "Success",
                 "properties": {
-                    "message": "Test log from ECF-ACA prototype",
+                    "message": f"Test event from ECF-ACA prototype to {hub_name} hub",
                 },
             }
         ]
@@ -50,12 +53,14 @@ def main():
         if err:
             print(f"Delivery failed: {err}")
         else:
-            print(f"Delivered to {msg.topic()} [{msg.partition()}] @ offset {msg.offset()}")
+            print(
+                f"Delivered to {msg.topic()} [{msg.partition()}] @ offset {msg.offset()}"
+            )
 
     payload = json.dumps(event).encode("utf-8")
     producer.produce(hub_name, value=payload, callback=delivery_report)
     producer.flush(timeout=10)
-    print("Done.")
+    print(f"Done. Sent to '{hub_name}' hub.")
 
 
 if __name__ == "__main__":

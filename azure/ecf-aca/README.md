@@ -9,7 +9,8 @@ A prototype exploring an alternative deployment model for EDOT Cloud Forwarder
 ```
 Azure Resources
   ├─ Diagnostic Settings ──► Event Hub "logs"    ──┐
-  └─ Diagnostic Settings ──► Event Hub "metrics" ──┘
+  ├─ Diagnostic Settings ──► Event Hub "metrics" ──┤
+  └─ Diagnostic Settings ──► Event Hub "traces"  ──┘
                                                     │
                                            (Kafka protocol)
                                                     │
@@ -20,6 +21,7 @@ Azure Resources
                               │   OTel Collector                 │
                               │   ├─ kafkareceiver/logs          │
                               │   ├─ kafkareceiver/metrics       │
+                              │   ├─ kafkareceiver/traces        │
                               │   ├─ azureencodingextension      │
                               │   ├─ beatsencodingextension      │
                               │   ├─ transformprocessor          │
@@ -127,9 +129,11 @@ The collector is configured via environment variables:
 | `EVENTHUB_CONNECTION_STRING` | Event Hub namespace connection string (SASL password) | Yes |
 | `EVENTHUB_LOGS_NAME` | Event Hub name for logs (default: `logs`) | No |
 | `EVENTHUB_METRICS_NAME` | Event Hub name for metrics (default: `metrics`) | No |
+| `EVENTHUB_TRACES_NAME` | Event Hub name for traces (default: `traces`) | No |
 | `EVENTHUB_CONSUMER_GROUP` | Kafka consumer group ID (default: `ecf`) | No |
 | `LOGS_ENCODING` | Encoding for logs (default: `azure_encoding`) | No |
 | `METRICS_ENCODING` | Encoding for metrics (default: `azure_encoding`) | No |
+| `TRACES_ENCODING` | Encoding for traces (default: `azure_encoding`) | No |
 | `ELASTICSEARCH_OTLP_ENDPOINT` | Elasticsearch OTLP endpoint | Yes |
 | `ELASTICSEARCH_API_KEY` | Elasticsearch API key | Yes |
 | `PIPELINE_EXPORTER` | Override exporter (default: `otlp/elastic`, use `debug` for testing) | No |
@@ -148,8 +152,8 @@ The encoding can be switched per-pipeline via environment variables:
 
 The Bicep template (`infra/main.bicep`) deploys:
 
-- **Event Hub Namespace** (Standard SKU with Kafka enabled) with `logs` and `metrics`
-  hubs, each with an `ecf` consumer group
+- **Event Hub Namespace** (Standard SKU with Kafka enabled) with `logs`, `metrics`,
+  and `traces` hubs, each with an `ecf` consumer group
 - **Shared Access Policy** (`ecf-listen`) with Listen rights — the connection string
   is used as the SASL/PLAIN password for the Kafka receiver
 - **Container Apps Environment** with Log Analytics workspace

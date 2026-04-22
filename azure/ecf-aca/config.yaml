@@ -33,6 +33,23 @@ receivers:
         mechanism: PLAIN
     tls: {}
 
+  kafka/traces:
+    brokers:
+      - ${env:EVENTHUB_NAMESPACE}:9093
+    traces:
+      topics:
+        - ${env:EVENTHUB_TRACES_NAME:-traces}
+      encoding: ${env:TRACES_ENCODING:-azure_encoding}
+    group_id: ${env:EVENTHUB_CONSUMER_GROUP:-ecf}
+    initial_offset: earliest
+    use_leader_epoch: false
+    auth:
+      sasl:
+        username: $$ConnectionString
+        password: ${env:EVENTHUB_CONNECTION_STRING}
+        mechanism: PLAIN
+    tls: {}
+
 exporters:
   debug:
     verbosity: detailed
@@ -77,6 +94,9 @@ service:
       exporters: ["${env:PIPELINE_EXPORTER:-otlp/elastic}"]
     metrics:
       receivers: [kafka/metrics]
+      exporters: ["${env:PIPELINE_EXPORTER:-otlp/elastic}"]
+    traces:
+      receivers: [kafka/traces]
       exporters: ["${env:PIPELINE_EXPORTER:-otlp/elastic}"]
   telemetry:
     metrics:
