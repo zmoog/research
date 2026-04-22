@@ -24,18 +24,7 @@ param minReplicas int = 1
 @description('Maximum number of replicas')
 param maxReplicas int = 3
 
-// ---------- Container Registry ----------
 
-resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
-  name: replace('${baseName}acr', '-', '')
-  location: location
-  sku: {
-    name: 'Basic'
-  }
-  properties: {
-    adminUserEnabled: true
-  }
-}
 
 // ---------- Event Hub Namespace + Hubs ----------
 // Kafka protocol requires Standard tier or above.
@@ -142,18 +131,7 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
     managedEnvironmentId: containerAppsEnv.id
     configuration: {
       activeRevisionsMode: 'Single'
-      registries: [
-        {
-          server: acr.properties.loginServer
-          username: acr.listCredentials().username
-          passwordSecretRef: 'acr-password'
-        }
-      ]
       secrets: [
-        {
-          name: 'acr-password'
-          value: acr.listCredentials().passwords[0].value
-        }
         {
           name: 'elasticsearch-api-key'
           value: elasticsearchApiKey
@@ -196,5 +174,4 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
 
 output containerAppName string = containerApp.name
 output eventHubNamespaceName string = eventHubNamespace.name
-output acrLoginServer string = acr.properties.loginServer
 output sendConnectionString string = sendRule.listKeys().primaryConnectionString

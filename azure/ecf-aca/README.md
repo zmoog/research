@@ -92,15 +92,29 @@ ecf-aca/
 
 ## Quick Start
 
+Set your Docker Hub username and make sure you are logged in (`docker login`):
+
+```bash
+export DOCKER_USERNAME=your-dockerhub-username
+```
+
+Then build, push, and deploy:
+
 ```bash
 # Build the collector binary
 make build
 
-# Build the container image
-make docker-build
+# Build and push the container image to Docker Hub
+make push
 
 # Deploy infrastructure (requires Azure CLI)
 make deploy
+```
+
+To update the running app with a new image later:
+
+```bash
+make update
 ```
 
 ## Configuration
@@ -139,7 +153,8 @@ The Bicep template (`infra/main.bicep`) deploys:
 - **Shared Access Policy** (`ecf-listen`) with Listen rights — the connection string
   is used as the SASL/PLAIN password for the Kafka receiver
 - **Container Apps Environment** with Log Analytics workspace
-- **Container App** with the collector image and all env vars wired up
+- **Container App** running the public collector image from Docker Hub with all env
+  vars wired up
 
 ### Event Hub SKU Requirement
 

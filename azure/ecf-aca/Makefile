@@ -1,6 +1,8 @@
-IMAGE_NAME ?= ecf-aca-collector
+DOCKER_USERNAME ?= mauriziobranca626
+IMAGE_NAME ?= cloud-forwarder-aca
 IMAGE_TAG ?= dev
-BASE_NAME ?= ecf-aca
+FULL_IMAGE_NAME = $(DOCKER_USERNAME)/$(IMAGE_NAME):$(IMAGE_TAG)
+BASE_NAME ?= cloud-forwarder-aca
 
 RESOURCE_GROUP ?= $(BASE_NAME)-rg
 LOCATION ?= eastus2
@@ -26,7 +28,7 @@ deploy:
 		--resource-group $(RESOURCE_GROUP) \
 		--template-file infra/main.bicep \
 		--parameters baseName=$(BASE_NAME) \
-		--parameters containerImage=mcr.microsoft.com/azuredocs/containerapps-helloworld:latest \
+		--parameters containerImage=$(FULL_IMAGE_NAME) \
 		--query 'properties.outputs' -o json
 
 # ---------- Build & Push Image ----------
@@ -35,26 +37,17 @@ docker-build:
 	docker build --platform linux/amd64 -t $(IMAGE_NAME):$(IMAGE_TAG) .
 
 push: docker-build
-	$(eval ACR := $(shell az deployment group show \
-		--resource-group $(RESOURCE_GROUP) \
-		--name main \
-		--query 'properties.outputs.acrLoginServer.value' -o tsv))
-	az acr login --name $(ACR)
-	docker tag $(IMAGE_NAME):$(IMAGE_TAG) $(ACR)/$(IMAGE_NAME):$(IMAGE_TAG)
-	docker push $(ACR)/$(IMAGE_NAME):$(IMAGE_TAG)
+	docker tag $(IMAGE_NAME):$(IMAGE_TAG) $(FULL_IMAGE_NAME)
+	docker push $(FULL_IMAGE_NAME)
 
 # ---------- Update App with Real Image ----------
 
 update: push
-	$(eval ACR := $(shell az deployment group show \
-		--resource-group $(RESOURCE_GROUP) \
-		--name main \
-		--query 'properties.outputs.acrLoginServer.value' -o tsv))
 	az deployment group create \
 		--resource-group $(RESOURCE_GROUP) \
 		--template-file infra/main.bicep \
 		--parameters baseName=$(BASE_NAME) \
-		--parameters containerImage=$(ACR)/$(IMAGE_NAME):$(IMAGE_TAG) \
+		--parameters containerImage=$(FULL_IMAGE_NAME) \
 		--query 'properties.outputs' -o json
 
 # ---------- Observe ----------
